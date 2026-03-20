@@ -1,0 +1,22 @@
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# C++ Build artifacts and shared libraries
+*.so
+*.pyd
+*.obj
+*.o
+*.out
+build/
+dist/
+
+# Operating system files
+.DS_Store
+Thumbs.db
