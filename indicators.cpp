@@ -25,3 +25,25 @@ void sma(double * input_ptr, double* output_ptr, int rows, int columns, int colu
         output_ptr[(r * columns) + column_index] = current_sum / window;
     }
 }
+
+void generate_signals(double* price_ptr, double* sma_ptr, double* signal_ptr, int rows, int columns, int index) {
+    for (int r = 0; r < rows; ++r) {
+        int memory_index = (r * columns) + index;
+
+        double todays_price = price_ptr[memory_index];
+        double todays_sma = sma_ptr[memory_index];
+
+        // If price is greater than sma then BUY
+        if (todays_price > todays_sma) {
+            signal_ptr[memory_index] = 1.0;
+        }
+        // If price is less than sma then SELL
+        else if (todays_price < todays_sma) {
+            signal_ptr[memory_index] = -1.0;
+        }
+        // If price is equal to sma then do nothing
+        else {
+            signal_ptr[memory_index] = 0.0;
+        }
+    }
+}
