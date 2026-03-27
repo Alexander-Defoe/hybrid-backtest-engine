@@ -7,17 +7,26 @@ class Portfolio:
         self.equity_curve = []
 
     def handle_signal(self, ticker, current_price, signal):
+        commission_rate = 0.001
         # Buys as many shares as the total cash can afford
         if signal == 1.0 and self.cash >= current_price:
             shares_to_buy = self.cash // current_price
-            self.positions[ticker] += shares_to_buy
-            self.cash -= (shares_to_buy * current_price)
+            cost = shares_to_buy * current_price
+            real_cost = cost + (cost * commission_rate)
+
+            # Checks if we can afford the shares and the fee
+            if self.cash >= real_cost:
+                self.positions[ticker] += shares_to_buy
+                self.cash -= real_cost
 
         # Sells all shares for this stock
         elif signal == -1.0 and self.positions[ticker] > 0:
             money_received = self.positions[ticker] * current_price
+            # Subtracts the fee from the money received
+            real_payout = money_received - (money_received * commission_rate)
+            
             self.positions[ticker] = 0
-            self.cash += money_received
+            self.cash += real_payout
 
 # Calculates the total account value for the current day
     def update_equity(self, current_prices):

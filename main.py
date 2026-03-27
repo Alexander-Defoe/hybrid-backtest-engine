@@ -13,13 +13,16 @@ close_matrix = getPriceData.get_price_data(symbols)
 sma_window = 20
 
 sma_results = my_cpp_module.calculate_smas(close_matrix, sma_window)
+macd_results = my_cpp_module.calculate_macd(close_matrix) # MACD has no window parameter
 
-# Creates buy/sell signals in Python using NumPy
-# If Price > SMA then buy, else sell
-signal_data = np.where(close_matrix > sma_results, 1.0, -1.0)
+# Creates buy/sell signals using the MACD
+signal_data = np.zeros_like(close_matrix)
 
-# The first 20 days of the SMA are 0.0 so we force those signals to 0.0
-signal_data[sma_results == 0.0] = 0.0
+# When MACD is greater than 0, buy
+signal_data[macd_results > 0] = 1.0
+
+# When MACD is less than 0, sell
+signal_data[macd_results < 0] = -1.0
 
 # Initializes the Portfolio
 my_portfolio = Portfolio(symbols, initial_cash=10000.0)
