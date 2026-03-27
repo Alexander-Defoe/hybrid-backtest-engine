@@ -73,6 +73,26 @@ for i, ticker in enumerate(symbols):
 
 print(f"Buy and Hold return: {final_value}")
 
+# Calculates the daily percentage return
+returns = np.diff(my_portfolio.equity_curve) / my_portfolio.equity_curve[:-1]
+
+# Calculates the average daily profit
+avg_return = np.mean(returns)
+# Calculates the standard deviation
+std_return = np.std(returns)
+# Calculates the sharpe ratio
+sharpe_ratio = (avg_return / std_return) * np.sqrt(252) if std_return != 0 else 0
+
+# Gets the highest peak the account value reached
+peak = np.maximum.accumulate(my_portfolio.equity_curve)
+# Calculates the percentage drop from the peak for each day
+drawdown = (my_portfolio.equity_curve - peak) / peak
+# Worst percentage drop
+max_drawdown = np.min(drawdown)
+
+print(f"Sharpe Ratio: {sharpe_ratio:.2f}")
+print(f"Max Drawdown: {max_drawdown * 100:.2f}%")
+
 # PLots the equity curve of the algorithm into a chart
 plt.plot(my_portfolio.equity_curve)
 plt.title("Performance")
