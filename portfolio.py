@@ -8,10 +8,17 @@ class Portfolio:
         # Dictionary to track the prices paid for each stock
         self.buy_prices = {ticker: 0.0 for ticker in ticker_list}
 
-    def handle_signal(self, ticker, current_price, signal):
+    def handle_signal(self, ticker, current_price, signal, volatility):
         commission_rate = 0.001
         # Maximum loss percentage permitted
         stop_loss_percentage = 0.05
+        # The target percentage gain
+        target_percentage= 2.0
+        target_risk = 0.02
+        
+        safe_volatility = max(volatility, 0.001)
+        budget = self.cash * (target_risk / safe_volatility)
+        budget = min(budget, self.cash)
 
         # If a stock is owned it checks if a stop-loss needs to be triggered
         if self.positions[ticker] > 0:
@@ -20,9 +27,15 @@ class Portfolio:
             if current_price <= loss:
                 signal = -1.0
                 print(f"Stop Loss triggered for {ticker} at {current_price}")
+            
+        if self.positions[ticker] > 0:
+            target_price = self.buy_prices[ticker] * (1.0 + target_percentage)
+            if current_price >= target_price:
+                signal = -1.0
+                print(f"Target profit reached {ticker} sold at {current_price}")
         # Buys as many shares as the total cash can afford
         if signal == 1.0 and self.cash >= current_price:
-            shares_to_buy = self.cash // current_price
+            shares_to_buy = budget // current_price
             cost = shares_to_buy * current_price
             real_cost = cost + (cost * commission_rate)
 
