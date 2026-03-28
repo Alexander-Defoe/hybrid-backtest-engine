@@ -37,8 +37,17 @@ for r in range(rows):
         current_price = close_matrix[r, i]
         current_signal = signal_data[r, i]
         
-        # Passes the price and signal to the portfolio
-        my_portfolio.handle_signal(ticker, current_price, current_signal)
+        start_idx = max(0, r - 20)
+        recent_prices = close_matrix[start_idx:r+1, i]
+        
+        if len(recent_prices) > 1:
+            recent_returns = np.diff(recent_prices) / recent_prices[:-1]
+            current_volatility = np.std(recent_returns)
+        else:
+            current_volatility = 0.001
+
+        # Passes the price, signal, and volatility to the portfolio
+        my_portfolio.handle_signal(ticker, current_price, current_signal, current_volatility)
     
     # A dictionary to map each ticker to its closing price
     day_prices = {ticker: close_matrix[r, j] for j, ticker in enumerate(symbols)}
