@@ -11,18 +11,27 @@ symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN']
 close_matrix = getPriceData.get_price_data(symbols)
 
 sma_window = 20
-
 sma_results = my_cpp_module.calculate_smas(close_matrix, sma_window)
 macd_results = my_cpp_module.calculate_macd(close_matrix) # MACD has no window parameter
+
+sma_200_results = my_cpp_module.calculate_smas(close_matrix, 200)
+rsi_results = my_cpp_module.calculate_rsi(close_matrix, 14)       
 
 # Creates buy/sell signals using the MACD
 signal_data = np.zeros_like(close_matrix)
 
-# When MACD is greater than 0, buy
-signal_data[macd_results > 0] = 1.0
+# Tries to close shorts if the MACD turns positive
+signal_data[macd_results > 0] = 0.5  
+# Tries to close longs if the MACD turns negative
+signal_data[macd_results < 0] = -0.5 
 
-# When MACD is less than 0, sell
-signal_data[macd_results < 0] = -1.0
+# When the MACD is greater than 0 it buys
+long_condition = (macd_results > 0) & (close_matrix > sma_200_results)
+signal_data[long_condition] = 1.0
+
+# When the MACD is less than 0 it sells
+short_condition = (macd_results < 0) & (close_matrix < sma_200_results) & (rsi_results > 70)
+signal_data[short_condition] = -1.0
 
 # Initializes the Portfolio
 my_portfolio = Portfolio(symbols, initial_cash=10000.0)
