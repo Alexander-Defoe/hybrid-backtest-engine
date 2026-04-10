@@ -1,5 +1,7 @@
+import logging
+
 class Portfolio:
-    def __init__(self, ticker_list, initial_cash=10000.0):
+    def __init__(self, ticker_list, initial_cash, risk_config):
         self.cash = initial_cash
         # Dictionary to track the shares for each ticker
         self.positions = {ticker: 0 for ticker in ticker_list}
@@ -7,50 +9,49 @@ class Portfolio:
         self.equity_curve = []
         # Dictionary to track the prices paid for each stock
         self.buy_prices = {ticker: 0.0 for ticker in ticker_list}
-
-    def handle_signal(self, ticker, current_price, signal, volatility):
-        commission_rate = 0.001
-        # Maximum loss percentage permitted
-        stop_loss_percentage = 0.05
-        # The target percentage gain
-        target_percentage = 0.15 
-        target_risk = 0.02
         
+        # Loads the risk settings from the JSON config file
+        self.commission_rate = risk_config['commission_rate']
+        self.stop_loss_percentage = risk_config['stop_loss_percentage']
+        self.target_percentage = risk_config['target_percentage']
+        self.target_risk = risk_config['target_risk']
+
+    def handle_signal(self, ticker, current_price, signal, volatility): 
         safe_volatility = max(volatility, 0.001)
-        budget = self.cash * (target_risk / safe_volatility)
+        budget = self.cash * (self.target_risk / safe_volatility)
         budget = min(budget, self.cash)
 
         # If a stock is owned it checks if a stop-loss needs to be triggered
         if self.positions[ticker] > 0:
-            loss = self.buy_prices[ticker] * (1.0 - stop_loss_percentage)
-            target_price = self.buy_prices[ticker] * (1.0 + target_percentage)
+            loss = self.buy_prices[ticker] * (1.0 - self.stop_loss_percentage)
+            target_price = self.buy_prices[ticker] * (1.0 + self.target_percentage)
             
             # If the price drops below the stop_loss_percentage a sell signal is forced
             if current_price <= loss:
                 signal = -0.5
-                print(f"Stop Loss triggered for {ticker} at {current_price}")
+                logging.warning(f"Stop Loss triggered for {ticker} at {current_price}")
             elif current_price >= target_price:
                 signal = -0.5
-                print(f"Target profit reached {ticker} sold at {current_price}")
+                logging.info(f"Target profit reached {ticker} sold at {current_price}")
 
         # Safety nets for short positions
         elif self.positions[ticker] < 0:
-            stop_price = self.buy_prices[ticker] * (1.0 + stop_loss_percentage)
-            target_price = self.buy_prices[ticker] * (1.0 - target_percentage)
+            stop_price = self.buy_prices[ticker] * (1.0 + self.stop_loss_percentage)
+            target_price = self.buy_prices[ticker] * (1.0 - self.target_percentage)
             
             if current_price >= stop_price:
                 signal = 0.5 
-                print(f"Short Stop Loss triggered for {ticker} at {current_price}")
+                logging.warning(f"Short Stop Loss triggered for {ticker} at {current_price}")
             elif current_price <= target_price:
                 signal = 0.5
-                print(f"Short Target profit reached for {ticker} at {current_price}")
+                logging.info(f"Short Target profit reached for {ticker} at {current_price}")
 
 
         # Buys as many shares as the total cash can afford
         if signal == 1.0 and self.positions[ticker] == 0 and self.cash >= current_price:
             shares_to_buy = budget // current_price
             cost = shares_to_buy * current_price
-            real_cost = cost + (cost * commission_rate)
+            real_cost = cost + (cost * self.commission_rate)
 
             # Checks if we can afford the shares and the fee
             if self.cash >= real_cost:
@@ -63,7 +64,7 @@ class Portfolio:
         elif signal == -1.0 and self.positions[ticker] == 0 and self.cash >= current_price:
             shares_to_short = budget // current_price
             money_received = shares_to_short * current_price
-            real_payout = money_received - (money_received * commission_rate)
+            real_payout = money_received - (money_received * self.commission_rate)
             
             self.positions[ticker] -= shares_to_short 
             self.cash += real_payout
@@ -73,7 +74,7 @@ class Portfolio:
         elif signal == -0.5 and self.positions[ticker] > 0:
             money_received = self.positions[ticker] * current_price
             # Subtracts the fee from the money received
-            real_payout = money_received - (money_received * commission_rate)
+            real_payout = money_received - (money_received * self.commission_rate)
             
             self.positions[ticker] = 0
             self.cash += real_payout
@@ -83,7 +84,7 @@ class Portfolio:
         elif signal == 0.5 and self.positions[ticker] < 0:
             shares_to_buy = abs(self.positions[ticker])
             cost = shares_to_buy * current_price
-            real_cost = cost + (cost * commission_rate)
+            real_cost = cost + (cost * self.commission_rate)
             
             self.positions[ticker] = 0
             self.cash -= real_cost
