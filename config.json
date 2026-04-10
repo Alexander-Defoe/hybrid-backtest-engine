@@ -1,0 +1,18 @@
+{
+    "portfolio": {
+        "symbols": ["AAPL", "MSFT", "GOOGL", "AMZN"],
+        "initial_cash": 10000.0
+    },
+    "strategy": {
+        "sma_fast_window": 20,
+        "sma_macro_window": 200,
+        "rsi_window": 14,
+        "rsi_overbought": 70
+    },
+    "risk_management": {
+        "commission_rate": 0.001,
+        "stop_loss_percentage": 0.05,
+        "target_percentage": 0.15,
+        "target_risk": 0.02
+    }
+}

@@ -3,9 +3,30 @@ import my_cpp_module
 from portfolio import Portfolio
 import numpy as np
 import matplotlib.pyplot as plt
+import logging
+import json
+
+logging.basicConfig(
+    level = logging.INFO,
+    format = '%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("trader.log"),
+        logging.StreamHandler()
+    ]
+)
 
 # The list of stocks to be iterated over
-symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN']
+with open('config.json', 'r') as file:
+    config = json.load(file)
+
+symbols = config['portfolio']['symbols']
+initial_cash = config['portfolio']['initial_cash']
+
+# Load Strategy Parameters
+sma_window = config['strategy']['sma_fast_window']
+macro_window = config['strategy']['sma_macro_window']
+rsi_window = config['strategy']['rsi_window']
+overbought_level = config['strategy']['rsi_overbought']
 
 # Calls the modular function, passes in the symbols and saves the result in a 2D matrix
 close_matrix = getPriceData.get_price_data(symbols)
@@ -34,7 +55,7 @@ short_condition = (macd_results < 0) & (close_matrix < sma_200_results) & (rsi_r
 signal_data[short_condition] = -1.0
 
 # Initializes the Portfolio
-my_portfolio = Portfolio(symbols, initial_cash=10000.0)
+my_portfolio = Portfolio(symbols, initial_cash, config['risk_management'])
 
 # The backesting loop
 rows = close_matrix.shape[0]
