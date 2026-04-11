@@ -1,16 +1,17 @@
-import getPriceData
-from portfolio import Portfolio
-from strategy import Strategy
+from src import getPriceData
+import my_cpp_module 
+from src.portfolio import Portfolio
+from src.strategy import Strategy
 import numpy as np
 import matplotlib.pyplot as plt
 import logging
-import json 
+import json
 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("trading.log"),
+        logging.FileHandler("logs/trader.log"),
         logging.StreamHandler()
     ]
 )
