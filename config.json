@@ -4,7 +4,6 @@
         "initial_cash": 10000.0
     },
     "strategy": {
-        "sma_fast_window": 20,
         "sma_macro_window": 200,
         "rsi_window": 14,
         "rsi_overbought": 70
