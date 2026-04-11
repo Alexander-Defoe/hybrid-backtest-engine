@@ -1,60 +1,35 @@
 import getPriceData
-import my_cpp_module 
 from portfolio import Portfolio
+from strategy import Strategy
 import numpy as np
 import matplotlib.pyplot as plt
 import logging
-import json
+import json 
 
 logging.basicConfig(
-    level = logging.INFO,
-    format = '%(asctime)s - %(levelname)s - %(message)s',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("trader.log"),
+        logging.FileHandler("trading.log"),
         logging.StreamHandler()
     ]
 )
 
-# The list of stocks to be iterated over
+# Loads from the config file
 with open('config.json', 'r') as file:
     config = json.load(file)
 
 symbols = config['portfolio']['symbols']
 initial_cash = config['portfolio']['initial_cash']
 
-# Load Strategy Parameters
-sma_window = config['strategy']['sma_fast_window']
-macro_window = config['strategy']['sma_macro_window']
-rsi_window = config['strategy']['rsi_window']
-overbought_level = config['strategy']['rsi_overbought']
-
 # Calls the modular function, passes in the symbols and saves the result in a 2D matrix
 close_matrix = getPriceData.get_price_data(symbols)
 
-sma_window = 20
-sma_results = my_cpp_module.calculate_smas(close_matrix, sma_window)
-macd_results = my_cpp_module.calculate_macd(close_matrix) # MACD has no window parameter
+# Initiates the strategy and generates signals
+my_strategy = Strategy(config['strategy'])
+signal_data = my_strategy.generate_signals(close_matrix)
 
-sma_200_results = my_cpp_module.calculate_smas(close_matrix, 200)
-rsi_results = my_cpp_module.calculate_rsi(close_matrix, 14)       
-
-# Creates buy/sell signals using the MACD
-signal_data = np.zeros_like(close_matrix)
-
-# Tries to close shorts if the MACD turns positive
-signal_data[macd_results > 0] = 0.5  
-# Tries to close longs if the MACD turns negative
-signal_data[macd_results < 0] = -0.5 
-
-# When the MACD is greater than 0 it buys
-long_condition = (macd_results > 0) & (close_matrix > sma_200_results)
-signal_data[long_condition] = 1.0
-
-# When the MACD is less than 0 it sells
-short_condition = (macd_results < 0) & (close_matrix < sma_200_results) & (rsi_results > 70)
-signal_data[short_condition] = -1.0
-
-# Initializes the Portfolio
+# Initializes the Portfolio 
 my_portfolio = Portfolio(symbols, initial_cash, config['risk_management'])
 
 # The backesting loop
@@ -90,7 +65,7 @@ print(f"Final Account Balance: ${my_portfolio.cash:.2f}")
 print(f"Final Total Equity: ${my_portfolio.equity_curve[-1]:.2f}")
 
 # Assigns the starting cash to be allocated to each stock
-capital_per_stock = 10000.0 / len(symbols)
+capital_per_stock = initial_cash / len(symbols)
 
 # Dictionary to hold the number of shares bought on day 1
 total_shares = {}
