@@ -1,4 +1,4 @@
-from src import getPriceData
+from src.data_manager import DataManager
 import my_cpp_module 
 from src.portfolio import Portfolio
 from src.strategy import Strategy
@@ -23,8 +23,21 @@ with open('config.json', 'r') as file:
 symbols = config['portfolio']['symbols']
 initial_cash = config['portfolio']['initial_cash']
 
-# Calls the modular function, passes in the symbols and saves the result in a 2D matrix
-close_matrix = getPriceData.get_price_data(symbols)
+# Local Database integration
+logging.info("Connecting to local market database...")
+db_manager = DataManager()
+
+# Loads the pivot table of the close prices directly from SQLite
+price_df = db_manager.load_close_prices(symbols)
+db_manager.close()
+
+# Failsafe if the database is empty
+if price_df.empty:
+    logging.error("Database is empty. Please run update_data.py first.")
+    exit(1)
+
+# Converts the Pandas dataframe into a contiguous 2D numpy array for C++
+close_matrix = price_df.to_numpy(dtype=np.float64) 
 
 # Initiates the strategy and generates signals
 my_strategy = Strategy(config['strategy'])
