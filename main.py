@@ -43,6 +43,8 @@ close_matrix = price_df.to_numpy(dtype=np.float64)
 my_strategy = Strategy(config['strategy'])
 signal_data = my_strategy.generate_signals(close_matrix)
 
+volatility_matrix = my_cpp_module.calculate_volatility(close_matrix, 20)
+
 # Initializes the Portfolio 
 my_portfolio = Portfolio(symbols, initial_cash, config['risk_management'])
 
@@ -55,15 +57,7 @@ for r in range(rows):
         # Gets their close prices and signal
         current_price = close_matrix[r, i]
         current_signal = signal_data[r, i]
-        
-        start_idx = max(0, r - 20)
-        recent_prices = close_matrix[start_idx:r+1, i]
-        
-        if len(recent_prices) > 1:
-            recent_returns = np.diff(recent_prices) / recent_prices[:-1]
-            current_volatility = np.std(recent_returns)
-        else:
-            current_volatility = 0.001
+        current_volatility = volatility_matrix[r, i]
 
         # Passes the price, signal, and volatility to the portfolio
         my_portfolio.handle_signal(ticker, current_price, current_signal, current_volatility)

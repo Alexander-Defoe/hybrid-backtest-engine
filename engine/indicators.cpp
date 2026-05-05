@@ -1,4 +1,5 @@
 #include "indicators.hpp"
+#include <cmath>
 
 void sma(double * input_ptr, double* output_ptr, int rows, int columns, int column_index, int window) {
     double current_sum = 0.0;
@@ -116,5 +117,48 @@ void generate_signals(double* price_ptr, double* sma_ptr, double* signal_ptr, in
         else {
             signal_ptr[memory_index] = 0.0;
         }
+    }
+}
+
+// Calculates the rolling volatility (standard deviation of daily returns) for a specific column
+void rolling_volatility(double* in_ptr, double* out_ptr, int rows, int cols, int col_idx, int window) {
+    for (int r = 0; r < rows; ++r) {
+        
+        // Day 0 has no previous day to calculate a return so is set a safe non-zero default
+        if (r < 1) {
+            out_ptr[r * cols + col_idx] = 0.001;
+            continue;
+        }
+
+        // Determines the start index of the lookback window to prevent out-of-bounds memory access
+        int start_idx = (r - window > 0) ? (r - window) : 0;
+        int count = r - start_idx;
+
+        // Calculates the mean daily return over the lookback window
+        double sum_returns = 0.0;
+        for (int i = start_idx + 1; i <= r; ++i) {
+            double prev_price = in_ptr[(i - 1) * cols + col_idx];
+            double curr_price = in_ptr[i * cols + col_idx];
+            double daily_return = (curr_price - prev_price) / prev_price;
+            sum_returns += daily_return;
+        }
+        double mean_return = sum_returns / count;
+
+        // Calculates the variance (sum of squared deviations from the mean)
+        double sum_variance = 0.0;
+        for (int i = start_idx + 1; i <= r; ++i) {
+            double prev_price = in_ptr[(i - 1) * cols + col_idx];
+            double curr_price = in_ptr[i * cols + col_idx];
+            double daily_return = (curr_price - prev_price) / prev_price;
+            
+            sum_variance += (daily_return - mean_return) * (daily_return - mean_return);
+        }
+
+        // Calculates the standard deviation
+        double variance = sum_variance / count;
+        double volatility = std::sqrt(variance);
+
+        // Stores the result and applies a 0.001 floor to prevent downstream division-by-zero errors
+        out_ptr[r * cols + col_idx] = (volatility > 0.001) ? volatility : 0.001;
     }
 }
