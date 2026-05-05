@@ -93,6 +93,34 @@ py::array_t<double> calculate_macd(py::array_t<double> input_matrix) {
     }
     return output_matrix;
 }
+// A python wrapper to calculate the rolling volatility matrix concurrently
+py::array_t<double> calculate_volatility(py::array_t<double> input_matrix, int window) {
+    // Extracts raw memory pointers and dimensions from the numpy array.
+    auto buf = input_matrix.request();
+    double* in_ptr = (double*) buf.ptr;
+    int rows = buf.shape[0];
+    int cols = buf.shape[1];
+
+    // Allocates a new empty numpy array of the same size to hold the results
+    py::array_t<double> output_matrix({rows, cols});
+    double* out_ptr = (double*) output_matrix.request().ptr;
+
+    // A vector to keep track of active worker threads
+    std::vector<std::thread> threads;
+    
+    // Creates a separate thread for each stock to calculate volatility in parallel
+    for (int i = 0; i < cols; ++i) {
+        threads.push_back(std::thread(rolling_volatility, in_ptr, out_ptr, rows, cols, i, window));
+    }
+
+    // This blocks execution and waits for all threads to finish their calculations
+    for (auto& t : threads) {
+        t.join();
+    }
+    
+    // Returns the populated numpy array back to Python
+    return output_matrix;
+}
 
 PYBIND11_MODULE(my_cpp_module, m) {
     m.doc() = "C++ Multithreaded Trading Indicators"; // Optional module docstring
@@ -101,4 +129,5 @@ PYBIND11_MODULE(my_cpp_module, m) {
     m.def("calculate_smas", &calculate_smas, "Calculates SMA matrix"); 
     m.def("calculate_rsi", &calculate_rsi, "Calculates RSI matrix"); 
     m.def("calculate_macd", &calculate_macd, "Calculates MACD matrix"); 
+    m.def("calculate_volatility", &calculate_volatility, "Calculates rolling volatility matrix");
 }

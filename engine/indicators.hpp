@@ -11,3 +11,6 @@ void rsi(double* in_ptr, double* out_ptr, int rows, int cols, int col_idx, int w
 
 // Calculates the MACD
 void macd(double* in_ptr, double* out_ptr, int rows, int cols, int col_idx);
+
+// Calculates the rolling volatility (standard deviation of returns) for a specific column over a given time window.
+void rolling_volatility(double* in_ptr, double* out_ptr, int rows, int cols, int col_idx, int window);
