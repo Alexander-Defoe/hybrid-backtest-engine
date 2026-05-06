@@ -12,11 +12,15 @@ class Portfolio:
         
         # Loads the risk settings from the JSON config file
         self.commission_rate = risk_config['commission_rate']
+        self.slippage_rate = risk_config.get('slippage_rate', 0.0)
         self.stop_loss_percentage = risk_config['stop_loss_percentage']
         self.target_percentage = risk_config['target_percentage']
         self.target_risk = risk_config['target_risk']
 
     def handle_signal(self, ticker, current_price, signal, volatility): 
+        buy_fill_price = current_price * (1.0 + self.slippage_rate)
+        sell_fill_price = current_price * (1.0 - self.slippage_rate)
+
         safe_volatility = max(volatility, 0.001)
         budget = self.cash * (self.target_risk / safe_volatility)
         budget = min(budget, self.cash)
@@ -48,32 +52,30 @@ class Portfolio:
 
 
         # Buys as many shares as the total cash can afford
-        if signal == 1.0 and self.positions[ticker] == 0 and self.cash >= current_price:
-            shares_to_buy = budget // current_price
-            cost = shares_to_buy * current_price
+        if signal == 1.0 and self.positions[ticker] == 0 and self.cash >= buy_fill_price:
+            shares_to_buy = budget // buy_fill_price
+            cost = shares_to_buy * buy_fill_price
             real_cost = cost + (cost * self.commission_rate)
 
             # Checks if we can afford the shares and the fee
             if self.cash >= real_cost:
                 self.positions[ticker] += shares_to_buy
                 self.cash -= real_cost
-                # Sets the new buy price
-                self.buy_prices[ticker] = current_price
+                self.buy_prices[ticker] = buy_fill_price # Records the actual fill price
 
         # Opens a short position
-        elif signal == -1.0 and self.positions[ticker] == 0 and self.cash >= current_price:
-            shares_to_short = budget // current_price
-            money_received = shares_to_short * current_price
+        elif signal == -1.0 and self.positions[ticker] == 0 and self.cash >= sell_fill_price:
+            shares_to_short = budget // sell_fill_price
+            money_received = shares_to_short * sell_fill_price
             real_payout = money_received - (money_received * self.commission_rate)
             
             self.positions[ticker] -= shares_to_short 
             self.cash += real_payout
-            self.buy_prices[ticker] = current_price
+            self.buy_prices[ticker] = sell_fill_price
 
         # Sells all shares for this stock
         elif signal == -0.5 and self.positions[ticker] > 0:
-            money_received = self.positions[ticker] * current_price
-            # Subtracts the fee from the money received
+            money_received = self.positions[ticker] * sell_fill_price
             real_payout = money_received - (money_received * self.commission_rate)
             
             self.positions[ticker] = 0
@@ -83,7 +85,7 @@ class Portfolio:
         # Closes a short position
         elif signal == 0.5 and self.positions[ticker] < 0:
             shares_to_buy = abs(self.positions[ticker])
-            cost = shares_to_buy * current_price
+            cost = shares_to_buy * buy_fill_price
             real_cost = cost + (cost * self.commission_rate)
             
             self.positions[ticker] = 0
