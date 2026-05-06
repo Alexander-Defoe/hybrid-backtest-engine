@@ -10,6 +10,7 @@
     },
     "risk_management": {
         "commission_rate": 0.001,
+        "slippage_rate": 0.0005,
         "stop_loss_percentage": 0.05,
         "target_percentage": 0.15,
         "target_risk": 0.02
