@@ -5,12 +5,14 @@ class Strategy:
     def __init__(self, strategy_config):
         # Loads the strategy parameters from the config file
         self.macro_window = strategy_config['sma_macro_window']
+        self.macd_fast = strategy_config['macd_fast']
+        self.macd_slow = strategy_config['macd_slow']
         self.rsi_window = strategy_config['rsi_window']
         self.overbought_level = strategy_config['rsi_overbought']
 
     def generate_signals(self, close_matrix):
-        # Calculates the indicators
-        macd_results = my_cpp_module.calculate_macd(close_matrix) 
+        # Passes the dynamic windows to the C++ engine
+        macd_results = my_cpp_module.calculate_macd(close_matrix, self.macd_fast, self.macd_slow) 
         sma_200_results = my_cpp_module.calculate_smas(close_matrix, self.macro_window) 
         rsi_results = my_cpp_module.calculate_rsi(close_matrix, self.rsi_window)       
 

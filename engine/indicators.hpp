@@ -10,7 +10,7 @@ void generate_signals(double* price_ptr, double* sma_ptr, double* signal_ptr, in
 void rsi(double* in_ptr, double* out_ptr, int rows, int cols, int col_idx, int window);
 
 // Calculates the MACD
-void macd(double* in_ptr, double* out_ptr, int rows, int cols, int col_idx);
+void macd(double* in_ptr, double* out_ptr, int rows, int cols, int col_idx, int fast_window, int slow_window);
 
 // Calculates the rolling volatility (standard deviation of returns) for a specific column over a given time window.
 void rolling_volatility(double* in_ptr, double* out_ptr, int rows, int cols, int col_idx, int window);
