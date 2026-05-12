@@ -70,7 +70,7 @@ py::array_t<double> calculate_rsi(py::array_t<double> input_matrix, int window) 
 }
 
 // Python wrapper for the MACD
-py::array_t<double> calculate_macd(py::array_t<double> input_matrix) {
+py::array_t<double> calculate_macd(py::array_t<double> input_matrix, int fast_window, int slow_window) {
     // Extracts the raw memory pointers from the numpy array
     auto buf = input_matrix.request();
     double* in_ptr = (double*) buf.ptr;
@@ -84,7 +84,8 @@ py::array_t<double> calculate_macd(py::array_t<double> input_matrix) {
     // Creates a thread for each stock to calculate the MACD concurrently
     std::vector<std::thread> threads;
     for (int i = 0; i < cols; ++i) {
-        threads.push_back(std::thread(macd, in_ptr, out_ptr, rows, cols, i));
+        // Passes the new window parameters to the thread
+        threads.push_back(std::thread(macd, in_ptr, out_ptr, rows, cols, i, fast_window, slow_window));
     }
 
     // Blocks python from continuing until all C++ threads have completed
@@ -93,6 +94,7 @@ py::array_t<double> calculate_macd(py::array_t<double> input_matrix) {
     }
     return output_matrix;
 }
+
 // A python wrapper to calculate the rolling volatility matrix concurrently
 py::array_t<double> calculate_volatility(py::array_t<double> input_matrix, int window) {
     // Extracts raw memory pointers and dimensions from the numpy array.

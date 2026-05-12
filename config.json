@@ -5,6 +5,8 @@
     },
     "strategy": {
         "sma_macro_window": 200,
+        "macd_fast": 12,
+        "macd_slow": 26,
         "rsi_window": 14,
         "rsi_overbought": 70
     },

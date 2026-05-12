@@ -54,10 +54,15 @@ rows = close_matrix.shape[0]
 for r in range(rows):
     # Loops through each stock
     for i, ticker in enumerate(symbols):
-        # Gets their close prices and signal
+        
         current_price = close_matrix[r, i]
-        current_signal = signal_data[r, i]
-        current_volatility = volatility_matrix[r, i]
+        
+        if r == 0:
+            current_signal = 0.0
+            current_volatility = 0.001
+        else:
+            current_signal = signal_data[r - 1, i]
+            current_volatility = volatility_matrix[r - 1, i]
 
         # Passes the price, signal, and volatility to the portfolio
         my_portfolio.handle_signal(ticker, current_price, current_signal, current_volatility)

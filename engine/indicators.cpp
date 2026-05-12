@@ -73,10 +73,10 @@ void rsi(double* in_ptr, double* out_ptr, int rows, int cols, int col_idx, int w
 }
 
 // Calculates the Moving Average Convergence Divergence
-void macd(double* in_ptr, double* out_ptr, int rows, int cols, int col_idx) {
-    // Calculates the weighting multipliers for the fast and slow EMAs
-    double k_fast = 2.0 / (12 + 1);
-    double k_slow = 2.0 / (26 + 1);
+void macd(double* in_ptr, double* out_ptr, int rows, int cols, int col_idx, int fast_window, int slow_window) {
+    // Calculates the weighting multipliers dynamically
+    double k_fast = 2.0 / (fast_window + 1.0);
+    double k_slow = 2.0 / (slow_window + 1.0);
 
     // Initializes both EMAs with the stock's day 1 closing price
     double ema_fast = in_ptr[col_idx];
@@ -89,15 +89,12 @@ void macd(double* in_ptr, double* out_ptr, int rows, int cols, int col_idx) {
     for (int r = 1; r < rows; ++r) {
         double price = in_ptr[r * cols + col_idx];
         
-        // Calculates todays EMA by weighting today's price and adding it to yesterdays EMA
         ema_fast = (price - ema_fast) * k_fast + ema_fast;
         ema_slow = (price - ema_slow) * k_slow + ema_slow;
         
-        // The difference between the fast trend and the slow trend
         out_ptr[r * cols + col_idx] = ema_fast - ema_slow; 
     }
 }
-
 void generate_signals(double* price_ptr, double* sma_ptr, double* signal_ptr, int rows, int columns, int index) {
     for (int r = 0; r < rows; ++r) {
         int memory_index = (r * columns) + index;
