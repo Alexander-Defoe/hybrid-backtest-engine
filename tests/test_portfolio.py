@@ -1,5 +1,5 @@
 import pytest
-from portfolio import Portfolio
+from src.portfolio import Portfolio
 
 test_risk_config = {
     "commission_rate": 0.001,
