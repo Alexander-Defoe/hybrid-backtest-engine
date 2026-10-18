@@ -32,6 +32,11 @@ class MarketData:
         if self.price_df.empty:
             raise RuntimeError("Database is empty. Please run update_data.py first.")
 
+        # The table comes back with its columns in alphabetical order rather than the order
+        # in config.json, so the names are read from the table itself to keep each one lined
+        # up with its own column of prices
+        self.symbols = list(self.price_df.columns)
+
         self.close_matrix = self.price_df.to_numpy(dtype=np.float64)
         self.rows = self.close_matrix.shape[0]
 
