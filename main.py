@@ -39,6 +39,11 @@ db_manager = DataManager()
 price_df = db_manager.load_close_prices(symbols)
 db_manager.close()
 
+# The table comes back with its columns in alphabetical order rather than the order in
+# config.json, so the names are read from the table itself to keep each one lined up
+# with its own column of prices
+symbols = list(price_df.columns)
+
 # Failsafe if the database is empty
 if price_df.empty:
     logging.error("Database is empty. Please run update_data.py first.")

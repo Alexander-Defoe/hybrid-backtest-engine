@@ -28,7 +28,7 @@ The simulated portfolio then walks through the data one day at a time. How much 
 - **Parameter search with a held-back period.** `optimiser.py` works through thousands of combinations of strategy settings, but chooses between them using only the first 70% of the history. The winner is then scored on the remaining 30%, which played no part in the choice. Reporting only the first number is how a backtest ends up claiming returns it could never repeat.
 - **An honesty check on the search itself.** The optimiser reports the average return across every combination during training against the same average on the unseen days, and the correlation between the two. A correlation near zero means a good training score told you nothing about what came next.
 - **Web dashboard.** `dashboard.py` serves the whole thing in a browser, with the settings editable and the trained and unseen periods always shown side by side.
-- **Tests.** The account logic for buying and for short-selling, and the performance maths, are covered by automated tests.
+- **Tests.** The account logic for buying and for short-selling, and the performance maths, are covered by automated tests. The C++ indicators are checked against the same calculations in pandas, and against inputs that used to make the module crash or read prices in the wrong order.
 
 ## Tech stack
 
@@ -107,7 +107,8 @@ hybrid-backtest-engine/
 │   └── dashboard.html      # The dashboard page, charts included
 ├── tests/
 │   ├── test_portfolio.py   # Tests for the buying and short-selling logic
-│   └── test_metrics.py     # Tests for the performance maths
+│   ├── test_metrics.py     # Tests for the performance maths
+│   └── test_indicators.py  # Checks the C++ indicators against pandas
 ├── update_data.py          # Refreshes the stored price data
 ├── main.py                 # Runs a single backtest and reports the results
 ├── optimiser.py            # Tries thousands of setting combinations
