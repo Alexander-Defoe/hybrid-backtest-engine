@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hybrid Backtest Engine</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f4f4f2;
+    --surface-1: #fcfcfb;
+    --border:    #dcdbd6;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #7a7975;
+    --series-1: #2a78d6;  /* the strategy */
+    --series-2: #eb6834;  /* buy and hold */
+    --good:     #1a7f5a;
+    --bad:      #c0362f;
+    --grid:     #e6e5e1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-0: #121211;
+      --surface-1: #1a1a19;
+      --border:    #33332f;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #8e8d85;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --good:     #3fae82;
+      --bad:      #e66767;
+      --grid:     #2a2a27;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--surface-0);
+    color: var(--text-primary);
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 64px; }
+
+  header h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  header p  { margin: 0; color: var(--text-secondary); font-size: 13.5px; }
+
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    margin-top: 20px;
+  }
+  .card > h2 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--text-muted); margin: 0 0 14px; font-weight: 600;
+  }
+
+  /* ---- controls ---- */
+  .controls { display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 11.5px; color: var(--text-secondary); font-weight: 500; }
+  .field input {
+    width: 92px; padding: 6px 8px; font: inherit; font-size: 13.5px;
+    background: var(--surface-0); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 6px;
+  }
+  button {
+    padding: 7px 16px; font: inherit; font-size: 13.5px; font-weight: 500;
+    background: var(--text-primary); color: var(--surface-1);
+    border: 0; border-radius: 6px; cursor: pointer;
+  }
+  button.ghost {
+    background: transparent; color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+
+  /* ---- verdict banner ---- */
+  .verdict { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 1.5; }
+  .verdict .dot { width: 9px; height: 9px; border-radius: 50%; margin-top: 6px; flex: none; }
+  .verdict strong { font-weight: 600; }
+
+  /* ---- stat tiles ---- */
+  .periods { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 720px) { .periods { grid-template-columns: 1fr; } }
+  .period h3 { font-size: 14px; margin: 0 0 2px; }
+  .period .sub { font-size: 12px; color: var(--text-muted); margin: 0 0 12px; min-height: 34px; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .tile { background: var(--surface-0); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .tile .k { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .tile .v { font-size: 20px; font-variant-numeric: tabular-nums; margin-top: 3px; letter-spacing: -0.02em; }
+  .pos { color: var(--good); } .neg { color: var(--bad); }
+
+  /* ---- chart ---- */
+  .legend { display: flex; gap: 18px; margin-bottom: 8px; font-size: 13px; color: var(--text-secondary); }
+  .legend span { display: flex; align-items: center; gap: 7px; }
+  .swatch { width: 12px; height: 3px; border-radius: 2px; flex: none; }
+  .chart-host { position: relative; }
+  svg { display: block; width: 100%; }
+  .tooltip {
+    position: absolute; pointer-events: none; opacity: 0; transition: opacity .1s;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 7px;
+    padding: 8px 10px; font-size: 12.5px; white-space: nowrap;
+    box-shadow: 0 4px 14px rgb(0 0 0 / 0.13); z-index: 5;
+  }
+  .tooltip .d { color: var(--text-muted); margin-bottom: 4px; }
+  .tooltip .r { display: flex; align-items: center; gap: 7px; font-variant-numeric: tabular-nums; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 5px 8px; border-bottom: 1px solid var(--border); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .hidden { display: none; }
+  .note { font-size: 12.5px; color: var(--text-muted); margin: 10px 0 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Hybrid Backtest Engine</h1>
+    <p>{{ symbols|join(', ') }} &middot; {{ first_date }} to {{ last_date }} &middot;
+       {{ total_days }} trading days &middot; starting cash ${{ '{:,.0f}'.format(initial_cash) }}</p>
+  </header>
+
+  <div class="card">
+    <h2>Settings</h2>
+    <div class="controls">
+      <div class="field"><label for="macd_fast">MACD fast</label><input id="macd_fast" type="number" value="{{ defaults.macd_fast }}" min="2" max="60"></div>
+      <div class="field"><label for="macd_slow">MACD slow</label><input id="macd_slow" type="number" value="{{ defaults.macd_slow }}" min="3" max="120"></div>
+      <div class="field"><label for="sma_macro_window">Trend average</label><input id="sma_macro_window" type="number" value="{{ defaults.sma_macro_window }}" min="5" max="400"></div>
+      <div class="field"><label for="rsi_window">RSI days</label><input id="rsi_window" type="number" value="{{ defaults.rsi_window }}" min="2" max="60"></div>
+      <div class="field"><label for="rsi_overbought">RSI overbought</label><input id="rsi_overbought" type="number" value="{{ defaults.rsi_overbought }}" min="50" max="95"></div>
+      <div class="field"><label for="stop_loss_percentage">Stop loss</label><input id="stop_loss_percentage" type="number" value="{{ defaults.stop_loss_percentage }}" step="0.01" min="0" max="1"></div>
+      <div class="field"><label for="target_percentage">Profit target</label><input id="target_percentage" type="number" value="{{ defaults.target_percentage }}" step="0.01" min="0" max="2"></div>
+      <div class="field"><label for="train_fraction">Training split</label><input id="train_fraction" type="number" value="{{ train_fraction }}" step="0.05" min="0.3" max="0.9"></div>
+      <button id="run">Run backtest</button>
+      <button id="reset" class="ghost">Reset</button>
+    </div>
+  </div>
+
+  <div class="card"><div class="verdict" id="verdict"><div class="dot"></div><div>Loading&hellip;</div></div></div>
+
+  <div class="card">
+    <h2>Performance</h2>
+    <div class="periods">
+      <div class="period">
+        <h3>Trained period</h3>
+        <p class="sub" id="trained-range">The settings above were chosen against these days, so good numbers here prove nothing.</p>
+        <div class="tiles" id="trained-tiles"></div>
+      </div>
+      <div class="period">
+        <h3>Unseen period</h3>
+        <p class="sub" id="unseen-range">These days played no part in choosing the settings. This is the only honest measure.</p>
+        <div class="tiles" id="unseen-tiles"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Account value over time</h2>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--series-1)"></i>Strategy</span>
+      <span><i class="swatch" style="background:var(--series-2)"></i>Buy &amp; hold</span>
+      <span style="color:var(--text-muted)"><i class="swatch" style="background:var(--text-muted)"></i>Unseen period begins</span>
+    </div>
+    <div class="chart-host" id="chart-host">
+      <svg id="chart" height="340" role="img" aria-label="Account value over time, strategy versus buy and hold"></svg>
+      <div class="tooltip" id="tooltip"></div>
+    </div>
+    <p class="note">One continuous run across the whole history. Everything to the right of the dashed line
+      is the held-back period.</p>
+    <p style="margin-top:12px"><button class="ghost" id="toggle-table">Show data table</button></p>
+    <div id="table-view" class="hidden" style="margin-top:12px;max-height:320px;overflow:auto"></div>
+  </div>
+
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const FIELDS = ['macd_fast','macd_slow','sma_macro_window','rsi_window','rsi_overbought',
+                'stop_loss_percentage','target_percentage','train_fraction'];
+const DEFAULTS = Object.fromEntries(FIELDS.map(f => [f, $(f).value]));
+
+// The first result is rendered straight from the page so there is nothing to wait for
+let LAST = {{ initial|tojson }};
+
+const money   = v => '$' + v.toLocaleString(undefined, {maximumFractionDigits: 0});
+const pct     = v => (v * 100).toFixed(1) + '%';
+const signed  = v => (v >= 0 ? '+' : '') + (v * 100).toFixed(1) + '%';
+const cls     = v => v >= 0 ? 'pos' : 'neg';
+
+function tiles(host, period) {
+  const s = period.stats, b = period.benchmark_stats;
+  const beat = s.final_equity - b.final_equity;
+  host.innerHTML = `
+    <div class="tile"><div class="k">Return</div><div class="v ${cls(s.total_return)}">${signed(s.total_return)}</div></div>
+    <div class="tile"><div class="k">Final value</div><div class="v">${money(s.final_equity)}</div></div>
+    <div class="tile"><div class="k">Sharpe</div><div class="v ${cls(s.sharpe)}">${s.sharpe.toFixed(2)}</div></div>
+    <div class="tile"><div class="k">Worst drop</div><div class="v neg">${pct(s.max_drawdown)}</div></div>
+    <div class="tile" style="grid-column:1/-1">
+      <div class="k">Versus buy &amp; hold</div>
+      <div class="v ${cls(beat)}">${beat >= 0 ? '+' : ''}${money(Math.round(beat))}</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
+        buy &amp; hold made ${signed(b.total_return)} over the same days</div>
+    </div>`;
+}
+
+function verdict(data) {
+  const s = data.unseen.stats, b = data.unseen.benchmark_stats;
+  const won = s.final_equity > b.final_equity;
+  const el = $('verdict');
+  el.querySelector('.dot').style.background = won ? 'var(--good)' : 'var(--bad)';
+  el.lastElementChild.innerHTML = won
+    ? `<strong>The strategy beat buy &amp; hold on days it had never seen</strong>
+       (${signed(s.total_return)} against ${signed(b.total_return)}).
+       Worth checking on other stocks and other date ranges before trusting it.`
+    : `<strong>The strategy did not beat buy &amp; hold on days it had never seen</strong>
+       (${signed(s.total_return)} against ${signed(b.total_return)}).
+       Good numbers on the trained period are the search fitting itself to past noise, not a real edge.`;
+}
+
+/* ---------- chart ---------- */
+function draw() {
+  if (!LAST) return;
+  const svg = $('chart');
+  const W = svg.clientWidth || svg.parentNode.clientWidth, H = 340;
+  const M = {t: 12, r: 16, b: 26, l: 62};
+  const iw = W - M.l - M.r, ih = H - M.t - M.b;
+
+  const a = LAST.full.equity_curve, bh = LAST.full.benchmark_curve, dates = LAST.full.dates;
+  const n = a.length;
+  const lo = Math.min(...a, ...bh), hi = Math.max(...a, ...bh);
+  const pad = (hi - lo) * 0.08 || 1;
+
+  // Rounds the axis out to whole, readable numbers rather than whatever the data happens to hit
+  const rawStep = (hi + pad - (lo - pad)) / 4;
+  const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const step = [1, 2, 2.5, 5, 10].find(m => m * mag >= rawStep) * mag;
+  const y0 = Math.floor((lo - pad) / step) * step;
+  const y1 = y0 + step * Math.ceil((hi + pad - y0) / step);
+
+  const X = i => M.l + (n <= 1 ? 0 : (i / (n - 1)) * iw);
+  const Y = v => M.t + ih - ((v - y0) / (y1 - y0)) * ih;
+
+  const path = arr => arr.map((v, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1)).join(' ');
+
+  // Recessive gridlines with value labels
+  let ticks = '';
+  for (let v = y0; v <= y1 + 1e-6; v += step) {
+    const y = Y(v);
+    ticks += `<line x1="${M.l}" y1="${y.toFixed(1)}" x2="${W - M.r}" y2="${y.toFixed(1)}"
+                stroke="var(--grid)" stroke-width="1"/>
+              <text x="${M.l - 9}" y="${(y + 4).toFixed(1)}" text-anchor="end"
+                fill="var(--text-muted)" font-size="11">${money(v)}</text>`;
+  }
+
+  // Date labels along the bottom
+  let xlabels = '';
+  [0, Math.floor(n / 3), Math.floor(2 * n / 3), n - 1].forEach((i, k) => {
+    xlabels += `<text x="${X(i).toFixed(1)}" y="${H - 7}" fill="var(--text-muted)" font-size="11"
+                  text-anchor="${k === 0 ? 'start' : k === 3 ? 'end' : 'middle'}">${dates[i]}</text>`;
+  });
+
+  // The moment the held-back period starts
+  const sx = X(LAST.split_index);
+  const splitMark = `
+    <rect x="${sx.toFixed(1)}" y="${M.t}" width="${(W - M.r - sx).toFixed(1)}" height="${ih}"
+      fill="var(--text-muted)" opacity="0.05"/>
+    <line x1="${sx.toFixed(1)}" y1="${M.t}" x2="${sx.toFixed(1)}" y2="${M.t + ih}"
+      stroke="var(--text-muted)" stroke-width="1.5" stroke-dasharray="4 4"/>
+    <text x="${(sx + 6).toFixed(1)}" y="${M.t + 13}" fill="var(--text-muted)" font-size="11">unseen &rarr;</text>`;
+
+  svg.setAttribute('width', W);
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = `
+    ${ticks}${splitMark}
+    <path d="${path(bh)}" fill="none" stroke="var(--series-2)" stroke-width="2"
+          stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="${path(a)}"  fill="none" stroke="var(--series-1)" stroke-width="2"
+          stroke-linejoin="round" stroke-linecap="round"/>
+    ${xlabels}
+    <g id="cross" opacity="0">
+      <line y1="${M.t}" y2="${M.t + ih}" stroke="var(--text-muted)" stroke-width="1"/>
+      <circle r="5" fill="var(--series-2)" stroke="var(--surface-1)" stroke-width="2"/>
+      <circle r="5" fill="var(--series-1)" stroke="var(--surface-1)" stroke-width="2"/>
+    </g>
+    <rect x="${M.l}" y="${M.t}" width="${iw}" height="${ih}" fill="transparent" id="hit"/>`;
+
+  const cross = svg.querySelector('#cross');
+  const [vline, dotB, dotA] = cross.children;
+  const tip = $('tooltip');
+
+  svg.querySelector('#hit').addEventListener('mousemove', e => {
+    const rect = svg.getBoundingClientRect();
+    const i = Math.max(0, Math.min(n - 1, Math.round(((e.clientX - rect.left - M.l) / iw) * (n - 1))));
+    const x = X(i);
+    cross.setAttribute('opacity', '1');
+    vline.setAttribute('x1', x); vline.setAttribute('x2', x);
+    dotA.setAttribute('cx', x); dotA.setAttribute('cy', Y(a[i]));
+    dotB.setAttribute('cx', x); dotB.setAttribute('cy', Y(bh[i]));
+    tip.style.opacity = '1';
+    tip.innerHTML = `<div class="d">${dates[i]}${i >= LAST.split_index ? ' &middot; unseen' : ''}</div>
+      <div class="r"><i class="swatch" style="background:var(--series-1)"></i>Strategy ${money(a[i])}</div>
+      <div class="r"><i class="swatch" style="background:var(--series-2)"></i>Buy &amp; hold ${money(bh[i])}</div>`;
+    const tw = tip.offsetWidth;
+    tip.style.left = Math.min(Math.max(x - tw / 2, 0), W - tw) + 'px';
+    tip.style.top = (Y(Math.max(a[i], bh[i])) - tip.offsetHeight - 12) + 'px';
+  });
+  svg.querySelector('#hit').addEventListener('mouseleave', () => {
+    cross.setAttribute('opacity', '0'); tip.style.opacity = '0';
+  });
+
+  // Accessible equivalent of the chart, sampled so it stays readable
+  const tableStep = Math.max(1, Math.floor(n / 60));
+  let rows = '';
+  for (let i = 0; i < n; i += tableStep) {
+    rows += `<tr><td>${dates[i]}</td><td>${money(a[i])}</td><td>${money(bh[i])}</td>
+             <td>${i >= LAST.split_index ? 'unseen' : 'trained'}</td></tr>`;
+  }
+  $('table-view').innerHTML = `<table><thead><tr><th>Date</th><th>Strategy</th>
+    <th>Buy &amp; hold</th><th>Period</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function render() {
+  tiles($('trained-tiles'), LAST.trained);
+  tiles($('unseen-tiles'), LAST.unseen);
+  $('trained-range').textContent =
+    `${LAST.trained.dates[0]} to ${LAST.trained.dates.at(-1)} — the settings were chosen against these days, so good numbers here prove nothing.`;
+  $('unseen-range').textContent =
+    `${LAST.unseen.dates[0]} to ${LAST.unseen.dates.at(-1)} — these days played no part in choosing the settings.`;
+  verdict(LAST);
+  draw();
+}
+
+async function run() {
+  const btn = $('run');
+  btn.disabled = true; btn.textContent = 'Running…';
+  const params = new URLSearchParams();
+  FIELDS.forEach(f => params.set(f, $(f).value));
+  try {
+    const res = await fetch('/api/backtest?' + params);
+    if (!res.ok) throw new Error(await res.text());
+    LAST = await res.json();
+    render();
+  } catch (err) {
+    $('verdict').lastElementChild.textContent = 'Backtest failed: ' + err.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Run backtest';
+  }
+}
+
+$('run').addEventListener('click', run);
+$('reset').addEventListener('click', () => {
+  FIELDS.forEach(f => $(f).value = DEFAULTS[f]);
+  run();
+});
+$('toggle-table').addEventListener('click', e => {
+  const t = $('table-view'); const hidden = t.classList.toggle('hidden');
+  e.target.textContent = hidden ? 'Show data table' : 'Hide data table';
+});
+addEventListener('resize', draw);
+render();
+</script>
+</body>
+</html>
