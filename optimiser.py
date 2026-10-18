@@ -24,6 +24,11 @@ db_manager = DataManager()
 price_df = db_manager.load_close_prices(symbols)
 db_manager.close()
 
+# The table comes back with its columns in alphabetical order rather than the order in
+# config.json, so the names are read from the table itself to keep each one lined up
+# with its own column of prices
+symbols = list(price_df.columns)
+
 close_matrix = price_df.to_numpy(dtype=np.float64)
 rows = close_matrix.shape[0]
 
