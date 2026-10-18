@@ -1,5 +1,6 @@
 from src.data_manager import DataManager
-import my_cpp_module 
+from src.backtester import run_backtest, calculate_volatility
+from src.metrics import summarise, buy_and_hold
 from src.portfolio import Portfolio
 from src.strategy import Strategy
 import numpy as np
@@ -22,6 +23,7 @@ with open('config.json', 'r') as file:
 
 symbols = config['portfolio']['symbols']
 initial_cash = config['portfolio']['initial_cash']
+volatility_window = config['strategy'].get('volatility_window', 20)
 
 # Local Database integration
 logging.info("Connecting to local market database...")
@@ -37,90 +39,30 @@ if price_df.empty:
     exit(1)
 
 # Converts the Pandas dataframe into a contiguous 2D numpy array for C++
-close_matrix = price_df.to_numpy(dtype=np.float64) 
+close_matrix = price_df.to_numpy(dtype=np.float64)
 
 # Initiates the strategy and generates signals
 my_strategy = Strategy(config['strategy'])
 signal_data = my_strategy.generate_signals(close_matrix)
 
-volatility_matrix = my_cpp_module.calculate_volatility(close_matrix, 20)
+volatility_matrix = calculate_volatility(close_matrix, volatility_window)
 
-# Initializes the Portfolio 
-my_portfolio = Portfolio(symbols, initial_cash, config['risk_management'])
-
-# The backesting loop
-rows = close_matrix.shape[0]
-
-for r in range(rows):
-    # Loops through each stock
-    for i, ticker in enumerate(symbols):
-        
-        current_price = close_matrix[r, i]
-        
-        if r == 0:
-            current_signal = 0.0
-            current_volatility = 0.001
-        else:
-            current_signal = signal_data[r - 1, i]
-            current_volatility = volatility_matrix[r - 1, i]
-
-        # Passes the price, signal, and volatility to the portfolio
-        my_portfolio.handle_signal(ticker, current_price, current_signal, current_volatility)
-    
-    # A dictionary to map each ticker to its closing price
-    day_prices = {ticker: close_matrix[r, j] for j, ticker in enumerate(symbols)}
-
-    # Calculates the total net worth for the day
-    my_portfolio.update_equity(day_prices)
+# Runs the simulation day by day
+my_portfolio = run_backtest(
+    close_matrix, signal_data, volatility_matrix,
+    symbols, initial_cash, config['risk_management']
+)
 
 # Backtesting results
+stats = summarise(my_portfolio.equity_curve)
+
 print(f"Final Account Balance: ${my_portfolio.cash:.2f}")
-print(f"Final Total Equity: ${my_portfolio.equity_curve[-1]:.2f}")
+print(f"Final Total Equity: ${stats['final_equity']:.2f}")
+print(f"Buy and Hold return: {buy_and_hold(close_matrix, symbols, initial_cash)}")
+print(f"Sharpe Ratio: {stats['sharpe']:.2f}")
+print(f"Max Drawdown: {stats['max_drawdown'] * 100:.2f}%")
 
-# Assigns the starting cash to be allocated to each stock
-capital_per_stock = initial_cash / len(symbols)
-
-# Dictionary to hold the number of shares bought on day 1
-total_shares = {}
-
-for i, ticker in enumerate(symbols):
-    # Gets the price of the stock on day 1
-    day_1_price = close_matrix[0,i]
-    # Adds the final value of the current stocks shares to the total
-    total_shares[ticker] = capital_per_stock // day_1_price
-
-final_value = 0
-
-# Calculates the final value of the buy and hold on the last trading day
-for i, ticker in enumerate(symbols):
-    # Gets the price of the stock on the final day
-    last_day_price = close_matrix[-1, i]
-    # Adds the final value of the current stocks shares to the total
-    final_value += total_shares[ticker] * last_day_price
-
-print(f"Buy and Hold return: {final_value}")
-
-# Calculates the daily percentage return
-returns = np.diff(my_portfolio.equity_curve) / my_portfolio.equity_curve[:-1]
-
-# Calculates the average daily profit
-avg_return = np.mean(returns)
-# Calculates the standard deviation
-std_return = np.std(returns)
-# Calculates the sharpe ratio
-sharpe_ratio = (avg_return / std_return) * np.sqrt(252) if std_return != 0 else 0
-
-# Gets the highest peak the account value reached
-peak = np.maximum.accumulate(my_portfolio.equity_curve)
-# Calculates the percentage drop from the peak for each day
-drawdown = (my_portfolio.equity_curve - peak) / peak
-# Worst percentage drop
-max_drawdown = np.min(drawdown)
-
-print(f"Sharpe Ratio: {sharpe_ratio:.2f}")
-print(f"Max Drawdown: {max_drawdown * 100:.2f}%")
-
-# PLots the equity curve of the algorithm into a chart
+# Plots the equity curve of the algorithm into a chart
 plt.plot(my_portfolio.equity_curve)
 plt.title("Performance")
 plt.xlabel("Days")
