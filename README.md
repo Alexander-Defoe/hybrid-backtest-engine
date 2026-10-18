@@ -25,8 +25,10 @@ The simulated portfolio then walks through the data one day at a time. How much 
 - **Trading costs included.** Every trade pays a commission and loses a little to slippage, the small gap between the price you see and the price you get. Results are shown next to a buy-and-hold benchmark rather than on their own.
 - **No use of future information.** Decisions are made from the previous day's figures, so the simulation cannot trade on anything it would not have known at the time.
 - **Local price storage.** Prices are cached on disk and refreshed without creating duplicate entries, which keeps repeat tests fast and lets them run offline.
-- **Parameter search.** `optimiser.py` works through thousands of combinations of strategy settings and ranks them by profit and by risk-adjusted return.
-- **Tests.** The account logic for buying and for short-selling is covered by automated tests.
+- **Parameter search with a held-back period.** `optimiser.py` works through thousands of combinations of strategy settings, but chooses between them using only the first 70% of the history. The winner is then scored on the remaining 30%, which played no part in the choice. Reporting only the first number is how a backtest ends up claiming returns it could never repeat.
+- **An honesty check on the search itself.** The optimiser reports the average return across every combination during training against the same average on the unseen days, and the correlation between the two. A correlation near zero means a good training score told you nothing about what came next.
+- **Web dashboard.** `dashboard.py` serves the whole thing in a browser, with the settings editable and the trained and unseen periods always shown side by side.
+- **Tests.** The account logic for buying and for short-selling, and the performance maths, are covered by automated tests.
 
 ## Tech stack
 
@@ -58,7 +60,10 @@ python main.py
 # 5. (optional) Search for better strategy settings
 python optimiser.py
 
-# 6. Run the tests (from the main project folder)
+# 6. (optional) Open the dashboard at http://127.0.0.1:5000
+python dashboard.py
+
+# 7. Run the tests (from the main project folder)
 pytest
 ```
 
@@ -94,20 +99,45 @@ hybrid-backtest-engine/
 ├── src/
 │   ├── data_manager.py     # Downloads and stores the price history
 │   ├── strategy.py         # Turns indicators into buy and sell decisions
-│   └── portfolio.py        # Tracks the account, trades, and trading costs
+│   ├── portfolio.py        # Tracks the account, trades, and trading costs
+│   ├── backtester.py       # The day-by-day simulation loop, used by everything
+│   ├── metrics.py          # Sharpe, drawdown, and the buy-and-hold benchmark
+│   └── experiment.py       # Loads prices once and splits them into trained/unseen
+├── templates/
+│   └── dashboard.html      # The dashboard page, charts included
 ├── tests/
-│   └── test_portfolio.py   # Tests for the buying and short-selling logic
+│   ├── test_portfolio.py   # Tests for the buying and short-selling logic
+│   └── test_metrics.py     # Tests for the performance maths
 ├── update_data.py          # Refreshes the stored price data
 ├── main.py                 # Runs a single backtest and reports the results
 ├── optimiser.py            # Tries thousands of setting combinations
+├── dashboard.py            # Serves the web dashboard
 ├── config.json             # Stocks, strategy, and risk settings
 └── setup.py                # Builds the C++ component
 ```
 
+The simulation loop lives in one place, `src/backtester.py`. Everything that runs a
+backtest calls it, so the command line tools and the dashboard can never drift apart and
+quietly start testing different things.
+
+## What the results currently say
+
+Run against AAPL, MSFT, GOOGL and AMZN over two years, the honest answer is that this
+strategy does not work. The search finds settings returning +81% over the period it was
+allowed to see, and those same settings lose 9.6% over the months that follow. Across all
+1,728 combinations the average return falls from +30% while training to -8% on unseen
+days, and the correlation between the two scores is -0.04. A good training score carried
+no information whatsoever about what happened next.
+
+That is the expected result for a simple trend-following rule on four large, heavily
+traded stocks, and it is worth more than a flattering number would be. The engine is
+built to find that out cheaply.
+
 ## Roadmap
 
+- **Account for the collateral required to short a stock**, which the simulation does not currently set aside. Opening a short also adds its proceeds to the cash balance, which inflates the position size of anything bought afterwards on the same day.
+- **Fix the moving-average warm-up.** The C++ `sma` fills its first `window - 1` days with zeros, so with a 200 day average the strategy spends its first 199 days believing every price is above its long-term trend. Those days should be excluded from trading instead.
+- **Test on more than four stocks and more than two years.** Four correlated mega-cap technology stocks over one bull run is not enough history to conclude anything.
+- **Roll the split forward** rather than cutting the history once, so the strategy is retested repeatedly on successive unseen windows.
 - **Measure the C++ speedup.** Time it against an equivalent version written in Python, so the performance claim is backed by numbers.
-- **Test the optimiser's results on unseen data.** At the moment it picks the best settings using the same data it is then judged on, which risks finding a strategy that only works in hindsight.
-- **Account for the collateral required to short a stock**, which the simulation does not currently set aside.
-- **Merge the duplicated simulation loop** shared by `main.py` and `optimiser.py` into a single reusable function.
 - **Save results and account histories to a file** so separate runs can be compared.

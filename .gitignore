@@ -19,6 +19,9 @@ dist/
 
 # Operating system files
 .DS_Store
-Thumbs.db*.log
+Thumbs.db
+
+# Logs, downloaded price data and other generated output
+*.log
 data/
 logs/

@@ -7,6 +7,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import logging
 import json
+from pathlib import Path
+
+# The log folder holds only generated output so it is not kept in version control,
+# which means a fresh clone does not have one yet. Creating it here keeps the first
+# run from failing on a missing directory.
+Path("logs").mkdir(exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
